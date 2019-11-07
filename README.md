@@ -1,8 +1,14 @@
 # web-scraping
 
-## Summery
-- To get data of products from `shopping.naver.com` via scrapping using node.js
+## Summary
+Get data of 
+1. Products from `shopping.naver.com` 
+2. Who traveled where and when from `instagram.com`  
+
+Via scrapping function of apify which is one of node.js sdk
+
 ---
 ### Used open source
 - **cheerio**
 - **axios**
+- **apify**
