@@ -5,7 +5,8 @@ const req = nodes => {};
 const doPuppeteer = async () => {
     try {
         const browser = await puppeteer.launch({
-            headless: false,
+            headless: true,
+            // slowMo:1000, // 실행속도
             defaultViewport: {
                 width: 1980,
                 height: 1080,
@@ -13,19 +14,24 @@ const doPuppeteer = async () => {
             }
         });
         const page = await browser.newPage();
-
+        page.on('console',msg=>console.log('PAGE LOG:',msg.text()));
         await page.goto(targetHost);
         await page.waitFor(1000);
-        await page.waitForSelector(".ftv_lst");
 
         // while (true) {
         console.log("start");
-        const partyListPerPage = await page.$$eval(
+        const categoryPageUrlList = await page.$$eval(
             "#home_category_area > div.co_category_menu > ul > li > a",
             nodes => {
-                console.log(nodes);
+                return nodes.map((category)=>{
+                    category.click()
+                    return [...document.querySelectorAll("#home_category_area .co_col strong a")].map( col=> {
+                        return col.href
+                    });
+                })
             }
         );
+        const flattenUrlList = categoryPageUrlList.flat();
         //     targetURLs.push(partyListPerPage);
         //     const next = await page.$("._next");
         //     const isNextable = await next.evaluate(
@@ -46,6 +52,7 @@ const doPuppeteer = async () => {
         // await page. nodes => {
         //     nodes.map(node => node.firstElementChild.href);
         // });
+        browser.close()
     } catch (err) {
         console.log(err);
     }

@@ -15,7 +15,7 @@ Via scrapping function of apify which is one of node.js sdk
 - **apify**
 
 각 클릭하는거 함수 모으기
-const d =[...document.querySelectorAll ("#home_category_area > div.co_category_menu > ul > li > a")].map(category=>category.click.bind(e))
+const d =[...document.querySelectorAll ("#home_category_area > div.co_category_menu > ul > li > a")].map(category=>category.click.bind(category))
 
 각 카테고리별 큰 컬럼 클릭 가져옴, 근데 이거 별로임
 [...document.querySelectorAll("#home_category_area .co_col strong a")].map(col=>col.click)
