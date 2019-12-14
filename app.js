@@ -29,7 +29,6 @@ const collectTargetCategoryUrls = browser => {
     }
   });
 };
-
 const openPages = (browser, urls) => {
   return new Promise(async (resolve, reject) => {
     const promises = [];
@@ -51,7 +50,7 @@ const openPages = (browser, urls) => {
         }),
       );
     }
-    // const a = await Promise.all(promises);
+    const a = await Promise.all(promises);
     console.log(a);
     console.log(a.length);
     // const page = await browser.newPage();
