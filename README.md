@@ -7,16 +7,12 @@ Get data of
 1. Products from `shopping.naver.com`
 2. Who traveled where and when from `instagram.com`
 
-Via scrapping function of apify which is one of node.js sdk
+Via scrapping function of puppeteer which is google-made library
 
 ---
 
 ### Used open source
-
-- ~~cheerio~~
-- **axios**
 - **puppeteer**
-- **apify**
 
 ### puppeteer api docs
 
