@@ -1,0 +1,5 @@
+{
+  "productNameSelector": "#_search_list > div.search_list.basis > ul > li .info .tit",
+  "productPriceSelector": "#_search_list > div.search_list.basis > ul > li .info .depth",
+  "productCategorySelector": "#_search_list > div.search_list.basis > ul > li .info .price em .num"
+}
