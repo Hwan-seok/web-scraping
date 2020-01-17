@@ -1,29 +1,39 @@
 const targetHost = 'https://shopping.naver.com/';
-const { productNameSelector, productPriceSelector, productCategorySelector } = require('./selector.json');
+const { productNameSelector, productPriceSelector, productCategorySelector, productImageSelector } = require('./selector.json');
 const puppeteer = require('puppeteer-extra');
+const fs = require('fs');
+const axios = require('axios');
 
 // add stealth plugin and use defaults (all evasion techniques)
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 
+fs.readdir('productImage', err => {
+  if (err) {
+    console.error('productImage 폴더가 없어 productImage 폴더를 생성');
+    fs.mkdirSync('productImage');
+  }
+});
 const collectTargetCategoryUrls = () => {
   return new Promise(async (resolve, reject) => {
     try {
       const browser = await puppeteer.launch({
-        headless: false, // headless모드는 터미널에서만 실행할건지의 여부
-        slowMo: 5000, // 실행속도
-
+        headless: process.env.NODE_ENV === 'production', // headless모드는 터미널에서만 실행할건지의 여부
+        args: ['--window-size=1920,1080', '--disable-notifications,'], // 브라우져 크기
+        // slowMo: 5000, // 실행속도
         defaultViewport: {
+          // 실제 데이터가 나오는 화면 크기
           width: 1980,
           height: 1080,
           isMobile: false,
         },
+        userDataDir: '',
       });
       const page = await browser.newPage();
       page.on('console', msg => console.log('PAGE LOG:', msg.text()));
+      await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36');
       await page.goto(targetHost);
       await page.waitFor(1000);
-      await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36');
 
       // while (true) {
       const categoryPageUrlList = await page.$$eval('#home_category_area > div.co_category_menu > ul > li > a', nodes =>
@@ -44,7 +54,7 @@ const openPages = async url => {
   try {
     const browser = await puppeteer.launch({
       headless: false, // headless모드는 터미널에서만 실행할건지의 여부
-      slowMo: 1000, // 실행속도
+      // slowMo: 1000, // 실행속도
       defaultViewport: {
         width: 1980,
         height: 1080,
@@ -53,131 +63,74 @@ const openPages = async url => {
     });
 
     const page = await browser.newPage();
-    function describe(jsHandle) {
-      return jsHandle.executionContext().evaluate(obj => {
-        // serialize |obj| however you want
-        return JSON.stringify(obj);
-      }, jsHandle);
-    }
 
-    page.on('console', async msg => {
-      const args = await Promise.all(msg.args().map(arg => describe(arg)));
-      console.log(...args);
-    });
+    page.on('console', msg => console.log('PAGE LOG:', msg.text()));
     await page.goto(url);
 
-    page.evaluate(
-      ({ productNameSelector, productPriceSelector, productCategorySelector }) => {
-        try {
-          const arr = [];
-          const config = {
-            attributes: true,
-            childList: true,
-            characterData: true,
-            subtree: true,
-            attributeOldValue: true,
-            characterDataOldValue: true,
+    for (let i = 0; i < 17; i++) {
+      await page.waitFor(300);
+      await page.evaluate(() => window.scrollBy(0, 1000));
+    }
+    const info = await page.evaluate(
+      ({ productNameSelector, productPriceSelector, productCategorySelector, productImageSelector }) => {
+        let result = [];
+        const productIamgeNodes = document.querySelectorAll(productImageSelector);
+        const productNameNodes = document.querySelectorAll(productNameSelector);
+        const productPriceNodes = document.querySelectorAll(productPriceSelector);
+        const productCategoryNodes = document.querySelectorAll(productCategorySelector);
+
+        const imageUrls = Array.from(productIamgeNodes, product => {
+          const src = product.src;
+          if (!src.startsWith('https://search.pstatic.net/common/')) {
+            return src.split('?')[0];
+          } else {
+            return decodeURIComponent(src.split('?src=')[1].split('&')[0]);
+          }
+        });
+        const names = Array.from(productNameNodes, product => product.innerText);
+        const prices = Array.from(productPriceNodes, product => product.innerText);
+        const categories = Array.from(productCategoryNodes, product => product.innerText);
+        const loopCount = names.length;
+        for (let i = 0; i < loopCount; i++) {
+          const product = {
+            imageUrl: imageUrls[i],
+            name: names[i],
+            price: prices[i],
+            category: categories[i],
           };
-          const initProductNameNodes = document.querySelectorAll(productNameSelector);
-          const initProductPriceNodes = document.querySelectorAll(productPriceSelector);
-          const initProductCategoryNodes = document.querySelectorAll(productCategorySelector);
-
-          const initNames = Array.from(initProductNameNodes, product => product.innerText);
-          const initPrices = Array.from(initProductPriceNodes, product => product.innerText);
-          const initCategories = Array.from(initProductCategoryNodes, product => product.innerText);
-
-          const length = initNames.length;
-          for (let i = 0; i < length; i++) {
-            const product = {
-              name: initNames[i],
-              price: initPrices[i],
-              category: initCategories[i],
-            };
-            arr.push(product);
-          }
-          console.log(arr.length);
-          console.log(arr[arr.length - 1].name);
-          const nextButton = document.querySelector('#_result_paging > a.next');
-          if (nextButton) {
-            console.log('nextnext1');
-            nextButton.click();
-          }
-          const target = document.querySelector('#_search_list');
-          const observer = new MutationObserver(async mutations => {
-            const isProductsReloaded = mutations.some(mutation => {
-              if (mutation.target.className === 'sort_content') {
-                console.log('mutation', mutation.target.className);
-                console.log(mutation);
-              }
-              return mutation.target.className === 'sort_content';
-            });
-            if (isProductsReloaded) {
-              console.log('reloaded!!!!!!!!!!!!!!!!!!!');
-              const productNameNodes = document.querySelectorAll(productNameSelector);
-              const productPriceNodes = document.querySelectorAll(productPriceSelector);
-              const productCategoryNodes = document.querySelectorAll(productCategorySelector);
-
-              const names = Array.from(productNameNodes, product => product.innerText);
-              const prices = Array.from(productPriceNodes, product => product.innerText);
-              const categories = Array.from(productCategoryNodes, product => product.innerText);
-              for (let i = 0; i < names.length; i++) {
-                const product = {
-                  name: names[i],
-                  price: prices[i],
-                  category: categories[i],
-                };
-                arr.push(product);
-              }
-              console.log(arr.length);
-              console.log(arr[arr.length - 44].name);
-
-              const nextButton = document.querySelector('#_result_paging > a.next');
-              if (nextButton) {
-                console.log('nextnext2');
-                nextButton.click();
-              }
-            }
-          });
-          observer.observe(target, config);
-        } catch (error) {
-          console.log(error);
+          result.push(product);
         }
       },
-      { productNameSelector, productPriceSelector, productCategorySelector },
+      { productNameSelector, productPriceSelector, productCategorySelector, productImageSelector },
     );
-    // );
-    // const initProducts = [];
-    // initProducts.push(
-    //   await Promise.all([
-    //     page.$$eval(productNameSelector, nodes => {
-    //       console.log(nodes);
-    //       return nodes.map(product => {
-    //         return product.innerText;
-    //       });
-    //     }),
-    //     page.$$eval(productPriceSelector, nodes => {
-    //       console.log(nodes);
-    //       return nodes.map(product => {
-    //         return product.innerText;
-    //       });
-    //     }),
-    //     page.$$eval(productCategorySelector, nodes => {
-    //       console.log(nodes);
-    //       return nodes.map(product => {
-    //         return product.innerText;
-    //       });
-    //     }),
-    //   ]),
-    // );
-
-    const nextButton = await page.$('#_result_paging > a.next');
-    if (nextButton) {
-      console.log('aSdfasf');
-      await nextButton.click();
+    
+    const nextButton = document.querySelector('#_result_paging > a.next');
+    if (nextButton && result.length < 1000) {
+      console.log("go to next page")
+      nextButton.click();
     }
-    await page.waitFor(3000);
+    const labelStream = fs.createWriteStream('label.txt');
+    const featureStream = fs.createWriteStream('feature.txt');
+
+    info.forEach(async (v, i) => {
+      try {
+        labelStream.write(`${v.category}\n`);
+        featureStream.write(`${v.name}|${v.price}\n`);
+        const imgResult = await axios.get(v.imageUrl, {
+          responseType: 'arraybuffer',
+        });
+        fs.writeFileSync(`productImage/${v.name}.jpg`, imgResult.data);
+      } catch (err) {
+        console.log(err);
+      }
+    });
+
+    featureStream.end('');
+    featureStream.on('finish', () => {
+      console.log('END');
+    });
   } catch (err) {
-    console.log('promise', err);
+    console.log('err', err);
   }
 };
 
@@ -188,7 +141,7 @@ const main = async () => {
     //const categoryUrls = await collectTargetCategoryUrls();
     //console.log(categoryUrls);
     //await openPages(categoryUrls[0]);
-    await openPages('https://search.shopping.naver.com/category/category.nhn?cat_id=50000167');
+    await openPages('https://search.shopping.naver.com/category/category.nhn?pagingIndex=1&pagingSize=80&cat_id=50000167');
   } catch (err) {
     console.log(err);
   }

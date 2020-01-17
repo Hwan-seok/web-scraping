@@ -1,5 +1,6 @@
 {
+  "productImageSelector":"#_search_list > div.search_list.basis > ul > li .img_area > a > img",
   "productNameSelector": "#_search_list > div.search_list.basis > ul > li .info .tit",
-  "productPriceSelector": "#_search_list > div.search_list.basis > ul > li .info .depth",
-  "productCategorySelector": "#_search_list > div.search_list.basis > ul > li .info .price em .num"
+  "productCategorySelector": "#_search_list > div.search_list.basis > ul > li .info .depth",
+  "productPriceSelector": "#_search_list > div.search_list.basis > ul > li .info .price em .num"
 }
