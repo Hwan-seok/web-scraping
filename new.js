@@ -18,12 +18,13 @@ const crawling = async () => {
   await page.goto('https://www.facebook.com/');
   await page.type('#email', '01064306352');
   await page.type('#pass', process.env.password);
+  await page.evaluate(() => {
+    const btn = document.querySelector('#loginbutton');
+    btn.click();
+  });
   await page.waitForResponse(response => {
     return response.url().includes('login_attempt');
   });
-  console.log('완료');
-  //   await page.close();
-  //   await browser.close();
 };
 
 crawling();

@@ -60,66 +60,70 @@ const openPages = async url => {
         height: 1080,
         isMobile: false,
       },
+      args: ['--window-size=1920,1080'],
     });
-
+    let finalResult = [];
     const page = await browser.newPage();
 
     page.on('console', msg => console.log('PAGE LOG:', msg.text()));
     await page.goto(url);
+    while (finalResult.length < 1000) {
+      await page.waitForResponse(response => {
+        return response.url().includes('category.nhn');
+      });
+      for (let i = 0; i < 17; i++) {
+        await page.waitFor(200);
+        await page.evaluate(() => window.scrollBy(0, 1000));
+      }
 
-    for (let i = 0; i < 17; i++) {
-      await page.waitFor(300);
-      await page.evaluate(() => window.scrollBy(0, 1000));
-    }
-    const info = await page.evaluate(
-      ({ productNameSelector, productPriceSelector, productCategorySelector, productImageSelector }) => {
-        let result = [];
-        const productIamgeNodes = document.querySelectorAll(productImageSelector);
-        const productNameNodes = document.querySelectorAll(productNameSelector);
-        const productPriceNodes = document.querySelectorAll(productPriceSelector);
-        const productCategoryNodes = document.querySelectorAll(productCategorySelector);
+      const info = await page.evaluate(
+        ({ productNameSelector, productPriceSelector, productCategorySelector, productImageSelector }) => {
+          let result = [];
+          const imageUrls = Array.from(document.querySelectorAll(productImageSelector), product => {
+            const src = product.src;
+            if (!src.startsWith('https://search.pstatic.net/common/')) {
+              return src.split('?')[0];
+            } else {
+              return decodeURIComponent(src.split('?src=')[1].split('&')[0]);
+            }
+          });
+          const names = Array.from(document.querySelectorAll(productNameSelector), product => product.innerText);
+          const prices = Array.from(document.querySelectorAll(productPriceSelector), product => product.innerText);
+          const categories = Array.from(document.querySelectorAll(productCategorySelector), product => product.innerText);
 
-        const imageUrls = Array.from(productIamgeNodes, product => {
-          const src = product.src;
-          if (!src.startsWith('https://search.pstatic.net/common/')) {
-            return src.split('?')[0];
-          } else {
-            return decodeURIComponent(src.split('?src=')[1].split('&')[0]);
+          const loopCount = names.length;
+          for (let i = 0; i < loopCount; i++) {
+            result.push({
+              imageUrl: imageUrls[i],
+              name: names[i],
+              price: prices[i],
+              category: categories[i],
+            });
           }
-        });
-        const names = Array.from(productNameNodes, product => product.innerText);
-        const prices = Array.from(productPriceNodes, product => product.innerText);
-        const categories = Array.from(productCategoryNodes, product => product.innerText);
-        const loopCount = names.length;
-        for (let i = 0; i < loopCount; i++) {
-          const product = {
-            imageUrl: imageUrls[i],
-            name: names[i],
-            price: prices[i],
-            category: categories[i],
-          };
-          result.push(product);
-        }
-      },
-      { productNameSelector, productPriceSelector, productCategorySelector, productImageSelector },
-    );
-    
-    const nextButton = document.querySelector('#_result_paging > a.next');
-    if (nextButton && result.length < 1000) {
-      console.log("go to next page")
-      nextButton.click();
+          return result;
+        },
+        { productNameSelector, productPriceSelector, productCategorySelector, productImageSelector },
+      );
+
+      finalResult.push(...info);
+      const nextButton = await page.$('#_result_paging > a.next');
+      if (nextButton) {
+        console.log('go to next page');
+        await page.evaluate(btn => btn.click(), nextButton);
+      }
     }
+
     const labelStream = fs.createWriteStream('label.txt');
     const featureStream = fs.createWriteStream('feature.txt');
 
-    info.forEach(async (v, i) => {
+    finalResult.forEach(async (v, i) => {
       try {
         labelStream.write(`${v.category}\n`);
         featureStream.write(`${v.name}|${v.price}\n`);
         const imgResult = await axios.get(v.imageUrl, {
           responseType: 'arraybuffer',
         });
-        fs.writeFileSync(`productImage/${v.name}.jpg`, imgResult.data);
+        fs.writeFile(`productImage/${v.name}.jpg`, imgResult.data);
       } catch (err) {
         console.log(err);
       }
